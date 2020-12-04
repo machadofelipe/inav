@@ -38,6 +38,14 @@
 #include "drivers/sensor.h"
 #include "drivers/compass/compass.h"
 
+#if defined(USE_MAG_MPU9250) && !defined(USE_GYRO_MPU9250)
+#include "drivers/accgyro/accgyro_mpu.h"
+
+#define MPU9250_PWR_MGMT_1_RESET_BIT                (1 << 7)
+#define MPU9250_PWR_MGMT_1_SLEEP_BIT                (1 << 6)
+#define MPU9250_INT_PIN_CFG_BYPASS_EN_BIT           (1 << 1)
+#endif
+
 // AK8963, mag sensor address
 #define AK8963_MAG_I2C_ADDRESS          0x0C
 #define AK8963_DEVICE_ID                0x48
@@ -162,8 +170,69 @@ static bool deviceDetect(magDev_t * mag)
     return false;
 }
 
+#if defined(USE_MAG_MPU9250) && !defined(USE_GYRO_MPU9250)
+static bool mpu9250DeviceDetect(busDevice_t * dev)
+{ 
+    bool isMpu9250Detected = false;
+
+    busSetSpeed(dev, BUS_SPEED_INITIALIZATION);
+    busWrite(dev, MPU_RA_PWR_MGMT_1, MPU9250_PWR_MGMT_1_RESET_BIT);
+
+    for (int retryCount = 0; ( (!isMpu9250Detected) && (retryCount < DETECTION_MAX_RETRY_COUNT) ); retryCount++) {
+        delay(150);
+
+        uint8_t sig = 0;
+        bool ack = busRead(dev, MPU_RA_WHO_AM_I, &sig);
+        isMpu9250Detected = ( ack && (sig == MPU9250_WHO_AM_I_CONST) );
+    }
+
+    return isMpu9250Detected;
+}
+
+static void mpu9250SetBypass(busDevice_t* dev)
+{
+
+    busSetSpeed(dev, BUS_SPEED_INITIALIZATION);
+
+    busWrite(dev, MPU_RA_PWR_MGMT_1, MPU9250_PWR_MGMT_1_RESET_BIT);
+    delay(100);
+
+    busWrite(dev, MPU_RA_SIGNAL_PATH_RESET, 0x07);      // BIT_GYRO | BIT_ACC | BIT_TEMP
+    delay(100);
+
+    busWrite(dev, MPU_RA_PWR_MGMT_1, 0);
+    delay(100);
+
+    // Data ready interrupt configuration
+    busWrite(dev, MPU_RA_INT_PIN_CFG, MPU9250_INT_PIN_CFG_BYPASS_EN_BIT);
+    delay(15);
+
+    busWrite(dev, MPU_RA_PWR_MGMT_1, MPU9250_PWR_MGMT_1_SLEEP_BIT);
+    delay(15);
+
+    busSetSpeed(dev, BUS_SPEED_FAST);
+}
+
+static void mpu9250TryInit(void)
+{
+    busDevice_t* dev = busDeviceInit(BUSTYPE_ANY, DEVHW_MPU9250, NULL, OWNER_MPU);
+    if (dev != NULL) {        
+        if (mpu9250DeviceDetect(dev)) {
+            mpu9250SetBypass(dev);
+        }
+        else{
+            busDeviceDeInit(dev);
+        };
+    }
+}
+#endif
+
 bool ak8963Detect(magDev_t * mag)
 {
+#if defined(USE_MAG_MPU9250) && !defined(USE_GYRO_MPU9250)
+    mpu9250TryInit();
+#endif
+
     mag->busDev = busDeviceInit(BUSTYPE_ANY, DEVHW_AK8963, mag->magSensorToUse, OWNER_COMPASS);
     if (mag->busDev == NULL) {
         return false;

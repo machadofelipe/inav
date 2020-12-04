@@ -229,6 +229,15 @@
     #endif
     BUSDEV_REGISTER_I2C(busdev_ist8308,     DEVHW_IST8308,      IST8308_I2C_BUS,    0x0C,               NONE,           DEVFLAGS_NONE,  0);
 #endif
+
+#if defined(USE_MAG_MPU9250) && !defined(USE_GYRO_MPU9250) 
+    #if defined(MPU9250_SPI_BUS)
+    BUSDEV_REGISTER_SPI(busdev_mpu9250,     DEVHW_MPU9250,      MPU9250_SPI_BUS,    MPU9250_CS_PIN,     GYRO_INT_EXTI,  DEVFLAGS_NONE);
+    #elif defined(MPU9250_I2C_BUS)
+    BUSDEV_REGISTER_I2C(busdev_mpu9250,     DEVHW_MPU9250,      MPU9250_I2C_BUS,    MPU_ADDRESS,        GYRO_INT_EXTI,  DEVFLAGS_NONE);
+    #endif
+#endif  
+
 #endif
 
 

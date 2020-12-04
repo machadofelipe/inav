@@ -222,7 +222,7 @@ bool compassDetect(magDev_t *dev, magSensor_e magHardwareToUse)
         FALLTHROUGH;
 
     case MAG_MPU9250:
-#ifdef USE_MAG_MPU9250
+#if defined (USE_MAG_MPU9250)  && defined(USE_GYRO_MPU9250)
         if (mpu9250CompassDetect(dev)) {
 #ifdef MAG_MPU9250_ALIGN
             dev->magAlign.onBoard = MAG_MPU9250_ALIGN;
